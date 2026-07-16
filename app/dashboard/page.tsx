@@ -1,22 +1,21 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import { useAuth } from '@/context/AuthContext'
 import api from '@/lib/api'
-import { useEffect } from 'react'
 
-
-
+// ---- Forme réelle confirmée par GET /api/become-organizer/ ----
 interface Application {
   id: string
-  firstName: string
-  lastName: string
+  userId: string
   email: string
+  phone: string
+  organizationName: string
+  organizationType: string
+  status: 'in-review' | 'approved' | 'declined'
   createdAt: string
-  motivation: string
-  status: 'pending' | 'approved' | 'rejected'
+  updatedAt: string
 }
-
 
 export default function DashboardPage() {
   return (
@@ -32,44 +31,56 @@ function DashboardContent() {
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
 
-  
-  
-  
-  
-   useEffect(() => {
-     async function fetchApplications() {
-       setLoading(true)
-       try {
-         const res = await api.get('/api/organizer-applications')
-         setApplications(res.data.data)
-       } catch (err) {
-         setErrorMsg("Impossible de charger les candidatures")
-       } finally {
-         setLoading(false)
-       }
-     }
-     fetchApplications()
-   }, [])
+  useEffect(() => {
+    async function fetchApplications() {
+      setLoading(true)
+      try {
+        const res = await api.get('/api/become-organizer/')
+        setApplications(res.data.data || [])
+      } catch (err) {
+        setErrorMsg("Impossible de charger les candidatures")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchApplications()
+  }, [])
 
-  const pendingCount = applications.filter(a => a.status === 'pending').length
+  const pendingCount = applications.filter(a => a.status === 'in-review').length
   const approvedCount = applications.filter(a => a.status === 'approved').length
-  const rejectedCount = applications.filter(a => a.status === 'rejected').length
+  const declinedCount = applications.filter(a => a.status === 'declined').length
 
   async function handleApprove(id: string) {
-     await api.patch(`/api/organizer-applications/${id}`, { status: 'approved' })
-    setApplications(prev =>
-      prev.map(a => (a.id === id ? { ...a, status: 'approved' } : a))
-    )
+    try {
+      await api.put(`/api/become-organizer/${id}/status`, { status: 'approved' })
+      setApplications(prev =>
+        prev.map(a => (a.id === id ? { ...a, status: 'approved' } : a))
+      )
+    } catch (err) {
+      setErrorMsg("Impossible d'approuver cette candidature")
+    }
   }
 
   async function handleReject(id: string) {
-     await api.patch(`/api/organizer-applications/${id}`, { status: 'rejected' })
-    setApplications(prev =>
-      prev.map(a => (a.id === id ? { ...a, status: 'rejected' } : a))
-    )
+    try {
+      await api.put(`/api/become-organizer/${id}/status`, { status: 'declined' })
+      setApplications(prev =>
+        prev.map(a => (a.id === id ? { ...a, status: 'declined' } : a))
+      )
+    } catch (err) {
+      setErrorMsg("Impossible de rejeter cette candidature")
+    }
   }
 
-  const pendingApplications = applications.filter(a => a.status === 'pending')
+  const pendingApplications = applications.filter(a => a.status === 'in-review')
+
+  function formatDate(iso: string) {
+    try {
+      return new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
+    } catch {
+      return iso
+    }
+  }
 
   return (
     <div style={{ backgroundColor: '#EFEDE6', minHeight: '100vh' }}>
@@ -116,10 +127,10 @@ function DashboardContent() {
         )}
 
         {/* STATS */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8,textAlign:'center', marginBottom: 20 }}>
           <StatBox n={pendingCount} label="En attente" />
           <StatBox n={approvedCount} label="Approuvées" />
-          <StatBox n={rejectedCount} label="Rejetées" />
+          <StatBox n={declinedCount} label="Rejetées" />
         </div>
 
         {loading && (
@@ -152,21 +163,23 @@ function DashboardContent() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: 13, fontWeight: 600, color: '#0C6B54',
               }}>
-                {app.firstName[0]}{app.lastName[0]}
+                {app.organizationName?.[0]?.toUpperCase() || '?'}
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A18' }}>
-                  {app.firstName} {app.lastName}
+                  {app.organizationName}
                 </div>
-                <div style={{ fontSize: 10.5, color: '#7A7A74', marginTop: 1 }}>{app.email}</div>
+                <div style={{ fontSize: 10.5, color: '#7A7A74', marginTop: 1 }}>
+                  {app.email} · {app.phone}
+                </div>
                 <div style={{ fontSize: 10, color: '#7A7A74', marginTop: 4 }}>
-                  Candidature du {app.createdAt}
+                  Candidature du {formatDate(app.createdAt)}
                 </div>
                 <div style={{
                   fontSize: 11.5, color: '#4A4A45', lineHeight: 1.6, marginTop: 7,
                   backgroundColor: '#F6F5F0', borderRadius: 8, padding: '8px 10px',
                 }}>
-                  {app.motivation}
+                  Type d'organisation : <strong>{app.organizationType}</strong>
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
                   <button

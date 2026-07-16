@@ -28,11 +28,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const savedUser = localStorage.getItem('user')
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
+    try {
+      const savedUser = localStorage.getItem('user')
+      if (savedUser) {
+        setUser(JSON.parse(savedUser))
+      }
+    } catch (err) {
+      // localStorage corrompu ou invalide -> on repart propre
+      localStorage.removeItem('user')
+      localStorage.removeItem('token')
+      setUser(null)
+    } finally {
+      // ---- LA CORRECTION CLÉ ----
+      // setLoading(false) est maintenant dans un `finally`,
+      // donc il s'exécute TOUJOURS, même si le JSON.parse plante.
+      setLoading(false)
     }
-    setLoading(false)
   }, [])
 
   const login = (userData: User, token: string) => {
