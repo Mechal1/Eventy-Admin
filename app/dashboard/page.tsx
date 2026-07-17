@@ -19,6 +19,8 @@ interface Application {
   updatedAt: string
 }
 
+type FilterStatus = 'in-review' | 'approved' | 'declined'
+
 export default function DashboardPage() {
   return (
     <ProtectedRoute>
@@ -32,6 +34,7 @@ function DashboardContent() {
   const [applications, setApplications] = useState<Application[]>([])
   const [loading, setLoading] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [activeFilter, setActiveFilter] = useState<FilterStatus>('in-review')
 
   useEffect(() => {
     async function fetchApplications() {
@@ -74,7 +77,7 @@ function DashboardContent() {
     }
   }
 
-  const pendingApplications = applications.filter(a => a.status === 'in-review')
+  const filteredApplications = applications.filter(a => a.status === activeFilter)
 
   function formatDate(iso: string) {
     try {
@@ -82,6 +85,12 @@ function DashboardContent() {
     } catch {
       return iso
     }
+  }
+
+  const emptyMessages: Record<FilterStatus, string> = {
+    'in-review': 'Aucune candidature en attente pour le moment.',
+    'approved': 'Aucune candidature approuvée pour le moment.',
+    'declined': 'Aucune candidature rejetée pour le moment.',
   }
 
   return (
@@ -124,11 +133,26 @@ function DashboardContent() {
             </div>
           )}
 
-          {/* STATS */}
+          {/* STATS — cliquables pour filtrer */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, textAlign: 'center', marginBottom: 20 }}>
-            <StatBox n={pendingCount} label="En attente" />
-            <StatBox n={approvedCount} label="Approuvées" />
-            <StatBox n={declinedCount} label="Rejetées" />
+            <StatBox
+              n={pendingCount}
+              label="En attente"
+              active={activeFilter === 'in-review'}
+              onClick={() => setActiveFilter('in-review')}
+            />
+            <StatBox
+              n={approvedCount}
+              label="Approuvées"
+              active={activeFilter === 'approved'}
+              onClick={() => setActiveFilter('approved')}
+            />
+            <StatBox
+              n={declinedCount}
+              label="Rejetées"
+              active={activeFilter === 'declined'}
+              onClick={() => setActiveFilter('declined')}
+            />
           </div>
 
           {loading && (
@@ -137,84 +161,106 @@ function DashboardContent() {
             </p>
           )}
 
-          {!loading && pendingApplications.length === 0 && (
+          {!loading && filteredApplications.length === 0 && (
             <div style={{
               textAlign: 'center', padding: '40px 20px', color: '#7A7A74', fontSize: 13,
               backgroundColor: '#fff', borderRadius: 14, border: '1px solid #E4E2DA',
             }}>
-              Aucune candidature en attente pour le moment.
+              {emptyMessages[activeFilter]}
             </div>
           )}
 
-          {/* LISTE DES CANDIDATURES */}
-          <div style={{ backgroundColor: '#fff', borderRadius: 14, border: '1px solid #E4E2DA', overflow: 'hidden' }}>
-            {pendingApplications.map((app, i) => (
-              <div
-                key={app.id}
-                style={{
-                  display: 'flex', gap: 12, padding: 14,
-                  borderBottom: i < pendingApplications.length - 1 ? '1px solid #E4E2DA' : 'none',
-                }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
-                  backgroundColor: '#EEF9F4', border: '1.5px solid #D6F0E8',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 600, color: '#0C6B54',
-                }}>
-                  {app.organizationName?.[0]?.toUpperCase() || '?'}
-                </div>
-                <div style={{ flex: 1 }}>
-
-                  {/* Nom + boutons */}
-                  <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4,
+          {/* LISTE DES CANDIDATURES (filtrée) */}
+          {filteredApplications.length > 0 && (
+            <div style={{ backgroundColor: '#fff', borderRadius: 14, border: '1px solid #E4E2DA', overflow: 'hidden' }}>
+              {filteredApplications.map((app, i) => (
+                <div
+                  key={app.id}
+                  style={{
+                    display: 'flex', gap: 12, padding: 14,
+                    borderBottom: i < filteredApplications.length - 1 ? '1px solid #E4E2DA' : 'none',
                   }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A18' }}>
-                      {app.organizationName}
+                  <div style={{
+                    width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                    backgroundColor: '#EEF9F4', border: '1.5px solid #D6F0E8',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 13, fontWeight: 600, color: '#0C6B54',
+                  }}>
+                    {app.organizationName?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+
+                    {/* Nom + boutons (uniquement pour "en attente") */}
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4,
+                    }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1A1A18' }}>
+                        {app.organizationName}
+                      </div>
+
+                      {activeFilter === 'in-review' && (
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => handleApprove(app.id)}
+                            style={{
+                              fontSize: 11, fontWeight: 500, padding: '5px 10px', borderRadius: 6,
+                              cursor: 'pointer', color: '#0C6B54', border: '1px solid #A9DCC7',
+                              backgroundColor: '#EEF9F4',
+                            }}>
+                            Approuver
+                          </button>
+
+                          <button
+                            onClick={() => handleReject(app.id)}
+                            style={{
+                              fontSize: 11, fontWeight: 500, padding: '5px 10px', borderRadius: 6,
+                              cursor: 'pointer', color: '#8C3018', border: '1px solid #F0BDB1',
+                              backgroundColor: '#FDEAE4',
+                            }}>
+                            Rejeter
+                          </button>
+                        </div>
+                      )}
+
+                      {activeFilter === 'approved' && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 500, padding: '3px 10px', borderRadius: 20,
+                          backgroundColor: '#EEF9F4', color: '#0C6B54',
+                        }}>
+                          Approuvée
+                        </span>
+                      )}
+
+                      {activeFilter === 'declined' && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 500, padding: '3px 10px', borderRadius: 20,
+                          backgroundColor: '#FDEAE4', color: '#8C3018',
+                        }}>
+                          Rejetée
+                        </span>
+                      )}
                     </div>
 
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        onClick={() => handleApprove(app.id)}
-                        style={{
-                          fontSize: 11, fontWeight: 500, padding: '5px 10px', borderRadius: 6,
-                          cursor: 'pointer', color: '#0C6B54', border: '1px solid #A9DCC7',
-                          backgroundColor: '#EEF9F4',
-                        }}>
-                        Approuver
-                      </button>
-
-                      <button
-                        onClick={() => handleReject(app.id)}
-                        style={{
-                          fontSize: 11, fontWeight: 500, padding: '5px 10px', borderRadius: 6,
-                          cursor: 'pointer', color: '#8C3018', border: '1px solid #F0BDB1',
-                          backgroundColor: '#FDEAE4',
-                        }}>
-                        Rejeter
-                      </button>
+                    <div style={{ fontSize: 10.5, color: '#7A7A74', marginTop: 1 }}>
+                      {app.email} · {app.phone}
                     </div>
-                  </div>
 
-                  <div style={{ fontSize: 10.5, color: '#7A7A74', marginTop: 1 }}>
-                    {app.email} · {app.phone}
-                  </div>
+                    <div style={{ fontSize: 10, color: '#7A7A74', marginTop: 4 }}>
+                      Candidature du {formatDate(app.createdAt)}
+                    </div>
 
-                  <div style={{ fontSize: 10, color: '#7A7A74', marginTop: 4 }}>
-                    Candidature du {formatDate(app.createdAt)}
-                  </div>
+                    <div style={{
+                      display: 'inline-block', fontSize: 11, color: '#4A4A45', marginTop: 8,
+                      backgroundColor: '#F6F5F0', borderRadius: 6, padding: '4px 10px',
+                    }}>
+                      Type d'organisation : <strong>{app.organizationType}</strong>
+                    </div>
 
-                  <div style={{
-                    display: 'inline-block', fontSize: 11, color: '#4A4A45', marginTop: 8,
-                    backgroundColor: '#F6F5F0', borderRadius: 6, padding: '4px 10px',
-                  }}>
-                    Type d'organisation : <strong>{app.organizationType}</strong>
                   </div>
-
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
         </div>
       </div>
@@ -222,13 +268,27 @@ function DashboardContent() {
   )
 }
 
-function StatBox({ n, label }: { n: number; label: string }) {
+function StatBox({
+  n, label, active, onClick,
+}: {
+  n: number
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
   return (
-    <div style={{
-      backgroundColor: '#fff', border: '1px solid #E4E2DA', borderRadius: 10, padding: '12px 10px',
-    }}>
+    <button
+      onClick={onClick}
+      style={{
+        backgroundColor: active ? '#EEF9F4' : '#fff',
+        border: active ? '1.5px solid #0C6B54' : '1px solid #E4E2DA',
+        borderRadius: 10,
+        padding: '12px 10px',
+        cursor: 'pointer',
+        textAlign: 'center',
+      }}>
       <div style={{ fontSize: 20, fontWeight: 600, color: '#1A1A18' }}>{n}</div>
-      <div style={{ fontSize: 10, color: '#7A7A74', marginTop: 2 }}>{label}</div>
-    </div>
+      <div style={{ fontSize: 10, color: active ? '#0C6B54' : '#7A7A74', marginTop: 2, fontWeight: active ? 600 : 400 }}>{label}</div>
+    </button>
   )
 }

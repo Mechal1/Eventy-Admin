@@ -34,6 +34,8 @@ function EventsContent() {
   const [events, setEvents] = useState<AdminEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<AdminEvent | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchEvents() {
@@ -49,6 +51,19 @@ function EventsContent() {
     }
     fetchEvents()
   }, [])
+
+  const handleDeleteEvent = async (id: string) => {
+    setDeleting(id)
+    try {
+      await api.delete(`/api/events/${id}`)
+      setEvents(prev => prev.filter(ev => ev.id !== id))
+    } catch (err) {
+      setErrorMsg("Impossible de supprimer cet événement")
+    } finally {
+      setDeleting(null)
+      setShowDeleteConfirm(null)
+    }
+  }
 
   return (
     <div style={{ display: 'flex', backgroundColor: '#EFEDE6', minHeight: '100vh' }}>
@@ -114,6 +129,8 @@ function EventsContent() {
                     <th style={thStyle}>Ville</th>
                     <th style={thStyle}>Catégorie</th>
                     <th style={thStyle}>Organisateur</th>
+                    <th style={thStyle}>Action</th>
+                    <th style={thStyle}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -128,6 +145,19 @@ function EventsContent() {
                         ? `${ev.organizer.firstName} ${ev.organizer.lastName}`
                         : '—'}
                     </td>
+                    <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <button
+                        onClick={() => setShowDeleteConfirm(ev)}
+                        disabled={deleting === ev.id}
+                        title="Supprimer"
+                        style={{
+                          padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+                          border: '1px solid #F0BDB1', backgroundColor: '#FDEAE4', color: '#8C3018',
+                          cursor: 'pointer', opacity: deleting === ev.id ? 0.5 : 1,
+                        }}>
+                        {deleting === ev.id ? '...' : 'Supprimer'}
+                      </button>
+                    </td>
                     </tr>
                   ))}
                 </tbody>
@@ -136,6 +166,36 @@ function EventsContent() {
           )}
         </div>
       </div>
+
+      {/* MODAL CONFIRMATION SUPPRESSION */}
+      {showDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E4E2DA', padding: 24, width: '100%', maxWidth: 320, margin: '0 18px' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1A1A18', marginBottom: 8 }}>
+              Supprimer cet événement ?
+            </h2>
+            <p style={{ fontSize: 12, color: '#7A7A74', marginBottom: 18, lineHeight: 1.5 }}>
+              Tu es sur le point de supprimer définitivement{' '}
+              <strong style={{ color: '#1A1A18' }}>{showDeleteConfirm.title}</strong>.
+              Cette action est irréversible.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                disabled={deleting === showDeleteConfirm.id}
+                style={{ flex: 1, padding: 9, borderRadius: 8, fontSize: 12, border: '1px solid #E4E2DA', background: '#fff', color: '#1A1A18', cursor: 'pointer' }}>
+                Annuler
+              </button>
+              <button
+                onClick={() => handleDeleteEvent(showDeleteConfirm.id)}
+                disabled={deleting === showDeleteConfirm.id}
+                style={{ flex: 1, padding: 9, borderRadius: 8, fontSize: 12, border: 'none', background: '#8C3018', color: '#fff', cursor: 'pointer', opacity: deleting === showDeleteConfirm.id ? 0.5 : 1 }}>
+                {deleting === showDeleteConfirm.id ? 'Suppression...' : 'Oui, supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

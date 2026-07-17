@@ -27,6 +27,8 @@ function UsersContent() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<AppUser | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchUsers() {
@@ -42,6 +44,19 @@ function UsersContent() {
     }
     fetchUsers()
   }, [])
+
+  const handleDeleteUser = async (id: string) => {
+    setDeleting(id)
+    try {
+      await api.delete(`/api/users/${id}`)
+      setUsers(prev => prev.filter(u => u.id !== id))
+    } catch (err) {
+      setErrorMsg("Impossible de supprimer cet utilisateur")
+    } finally {
+      setDeleting(null)
+      setShowDeleteConfirm(null)
+    }
+  }
 
   return (
     <div style={{ display: 'flex', backgroundColor: '#EFEDE6', minHeight: '100vh' }}>
@@ -106,6 +121,8 @@ function UsersContent() {
                     <th style={thStyle}>Email</th>
                     <th style={thStyle}>Rôle</th>
                     <th style={thStyle}>Inscrit le</th>
+                    <th style={thStyle}>Action</th>
+                    <th style={thStyle}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -123,6 +140,19 @@ function UsersContent() {
                         </span>
                       </td>
                       <td style={tdStyle}>{u.createdAt || '—'}</td>
+                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                        <button
+                          onClick={() => setShowDeleteConfirm(u)}
+                          disabled={deleting === u.id}
+                          title="Supprimer"
+                          style={{
+                            padding: '5px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500,
+                            border: '1px solid #F0BDB1', backgroundColor: '#FDEAE4', color: '#8C3018',
+                            cursor: 'pointer', opacity: deleting === u.id ? 0.5 : 1,
+                          }}>
+                          {deleting === u.id ? '...' : 'Supprimer'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -131,6 +161,38 @@ function UsersContent() {
           )}
         </div>
       </div>
+
+      {/* MODAL CONFIRMATION SUPPRESSION */}
+      {showDeleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+          <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #E4E2DA', padding: 24, width: '100%', maxWidth: 320, margin: '0 18px' }}>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1A1A18', marginBottom: 8 }}>
+              Supprimer cet utilisateur ?
+            </h2>
+            <p style={{ fontSize: 12, color: '#7A7A74', marginBottom: 18, lineHeight: 1.5 }}>
+              Tu es sur le point de supprimer définitivement{' '}
+              <strong style={{ color: '#1A1A18' }}>
+                {showDeleteConfirm.firstName || showDeleteConfirm.email} {showDeleteConfirm.lastName || ''}
+              </strong>.
+              Cette action est irréversible.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setShowDeleteConfirm(null)}
+                disabled={deleting === showDeleteConfirm.id}
+                style={{ flex: 1, padding: 9, borderRadius: 8, fontSize: 12, border: '1px solid #E4E2DA', background: '#fff', color: '#1A1A18', cursor: 'pointer' }}>
+                Annuler
+              </button>
+              <button
+                onClick={() => handleDeleteUser(showDeleteConfirm.id)}
+                disabled={deleting === showDeleteConfirm.id}
+                style={{ flex: 1, padding: 9, borderRadius: 8, fontSize: 12, border: 'none', background: '#8C3018', color: '#fff', cursor: 'pointer', opacity: deleting === showDeleteConfirm.id ? 0.5 : 1 }}>
+                {deleting === showDeleteConfirm.id ? 'Suppression...' : 'Oui, supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
